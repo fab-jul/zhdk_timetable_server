@@ -8,19 +8,30 @@ import logging
 import re
 import time
 import contextlib
+import argparse
 import cal_parse_lib
 
-hostName = "0.0.0.0"
+p = argparse.ArgumentParser()
 # note that this is a pair defined in the router!
-serverPortInternal = 443
-serverPortExternal = 9999
+p.add_argument("--port_int", default=443, type=int)
+p.add_argument("--port_ext", default=9999, type=int)
+p.add_argument("--live", type=bool, default=True)
 
-# TODO
-POST_DESTINATION = f"http://77.109.152.38:{serverPortExternal}/"
+flags = p.parse_args()
+
+hostName = "0.0.0.0"
+serverPortInternal = flags.port_int
+serverPortExternal = flags.port_ext
+
+if flags.live:
+    POST_DESTINATION = f"http://85.195.207.87:{serverPortExternal}/"
+else:
+    POST_DESTINATION = f"http://0.0.0.0:{serverPortExternal}/"
+
 
 ZHDK_IDENTIFICATION = '<meta name="copyright" content="(c) 2011 Zuercher Hochschule der Kuenste">'
 
-FUCKING_HEADER = """
+HTML_HEADER = """
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -92,6 +103,11 @@ class GetType(enum.Enum):
 
 class Server(BaseHTTPRequestHandler):
 
+  def setup(self):
+    print("Setup")
+    self.timeout = 5
+    super().setup()
+
   def _write_str(self, s: str):
     self.wfile.write(s.encode("utf-8"))
 
@@ -102,7 +118,7 @@ class Server(BaseHTTPRequestHandler):
     self.end_headers()
     self._write_str("<!doctype html>")
     self._write_str("<html>")
-    self._write_str(FUCKING_HEADER)
+    self._write_str(HTML_HEADER)
     self._write_str("<body>")
     self._write_str(f"<h1>ZHDK Calendar Exporter</h1>")
     yield
@@ -117,14 +133,6 @@ class Server(BaseHTTPRequestHandler):
     elif request_type == GetType.DEEZ_NUTS:
       with self.output(200):
         self._write_str('<p class="error">DEEZ NUTS</p>')
-#    elif request_type == GetType.DOWNLOAD_ICS:
-#      self.send_response(200)
-#      self.send_header('Content-type', 'text')
-#      self.send_header('Content-Disposition', 'attachment; filename="zhdk.ics"')
-#      self.end_headers()
-#      print(f'Serving {self.path} ...')
-#      with open(self.path.lstrip('/'), 'rb') as f: 
-#        self.wfile.write(f.read()) 
     else:
       with self.output(200):
         self._write_str('<p class="error">wtf</p>')
@@ -143,10 +151,6 @@ class Server(BaseHTTPRequestHandler):
     self.send_response(301)
     self.send_header('Location', f'{url.scheme}://{url.netloc}/error')
     self.end_headers()
-#    with self.output(200):
-#      self._write_str(
-#          '<p><span class="error">Looks like incorrect HTML!</span></p>')
-#    #self.rfile.close()
 
   def do_POST(self):
     content_len = int(self.headers.get('Content-Length'))
